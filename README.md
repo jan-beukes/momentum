@@ -1,2 +1,2 @@
 # momentum
-better raylib-ball
+better raylib-ball in odin
