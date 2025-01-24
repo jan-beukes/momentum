@@ -17,8 +17,6 @@ odin build web/ -target:js_wasm32 -build-mode:obj -define:RAYLIB_WASM_LIB=env.o 
 
 ODIN_PATH=$(odin root)
 
-cp $ODIN_PATH/core/sys/wasm/js/odin.js $OUT_DIR
-
 files="$OUT_DIR/game.wasm.o ${ODIN_PATH}/vendor/raylib/wasm/libraylib.a"
 
 # index_template.html contains the javascript code that calls the procedures in

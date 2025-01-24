@@ -256,7 +256,6 @@ add_bodies :: proc() {
 // called every frame from platform
 update :: proc() {
 	dt := rl.GetFrameTime()
-	rl.SetWindowTitle(rl.TextFormat("%d", rl.GetFPS()))
 
 	when ODIN_OS != .JS {
 		if rl.IsCursorHidden() && selected_body == nil do rl.ShowCursor()
