@@ -3,7 +3,7 @@
 # Point this to where you installed emscripten. Optional on systems that already
 # have `emcc` in the path.
 EMSCRIPTEN_SDK_DIR="$HOME/Software/emsdk"
-OUT_DIR="build"
+OUT_DIR="./"
 
 mkdir -p $OUT_DIR
 
