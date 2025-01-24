@@ -1,10 +1,8 @@
 package main
 
-import "base:runtime"
 import "core:fmt"
 import "core:math"
 import "core:math/linalg"
-import "core:os"
 
 import rl "vendor:raylib"
 import "vendor:raylib/rlgl"
@@ -38,9 +36,11 @@ Body :: struct {
 	accel:  Vector2,
 }
 
+// global
 bodies: [dynamic]Body
 selected_body: ^Body
 hud_active := true
+quit := false
 
 draw_body :: proc(body: Body) {
 	using body
@@ -81,7 +81,7 @@ collide_with_borders :: proc(body: ^Body) {
 // Returns final velocity of body 1
 collision_result :: proc(n, v1, v2: Vector2, m1, m2: f32) -> Vector2 {
 	// n is line of impact
-	return v1 - ((2*m2 / (m1 + m2)) * (linalg.dot(v1 - v2, n)) * n)
+	return v1 - ((2 * m2 / (m1 + m2)) * (linalg.dot(v1 - v2, n)) * n)
 
 }
 
@@ -97,22 +97,21 @@ collide_with_bodies :: proc(body: ^Body) {
 				   other.pos * SCALE,
 				   other.radius * SCALE,
 			   )) {
-				
-				line_of_impact := linalg.normalize(other.pos - body.pos)
-				// seperate
-				dr := (other.radius + body.radius) - linalg.length(other.pos - body.pos) // intersection depth
-				body.pos -=  line_of_impact * (0.5 * dr)
-				other.pos += line_of_impact * (0.5 * dr) 
 
-				body_vel_final := collision_result(line_of_impact, body.vel, other.vel,
-											body.mass, other.mass)
-				other_vel_final := collision_result(line_of_impact, other.vel, body.vel,
-											other.mass, body.mass)
-				
-				body.vel = body_vel_final
-				other.vel = other_vel_final
-				
-			   }
+			line_of_impact := linalg.normalize(other.pos - body.pos)
+			// seperate
+			dr := (other.radius + body.radius) - linalg.length(other.pos - body.pos) // intersection depth
+			body.pos -= line_of_impact * dr
+
+			body.vel = collision_result(line_of_impact, body.vel, other.vel, body.mass, other.mass)
+			other.vel = collision_result(
+				line_of_impact,
+				other.vel,
+				body.vel,
+				other.mass,
+				body.mass,
+			)
+		}
 
 	}
 }
@@ -143,8 +142,17 @@ update_draw_frame :: proc() {
 	}
 	mouse_pos := rl.GetMousePosition()
 	if selected_body != nil {
-		rl.DrawCircleV(selected_body.pos * SCALE, CURSOR_SIZE*0.5, rl.ColorBrightness(selected_body.color, -0.2))
-		rl.DrawLineEx(mouse_pos, selected_body.pos * SCALE, 5, rl.ColorBrightness(selected_body.color, -0.2))
+		rl.DrawCircleV(
+			selected_body.pos * SCALE,
+			CURSOR_SIZE * 0.5,
+			rl.ColorBrightness(selected_body.color, -0.2),
+		)
+		rl.DrawLineEx(
+			mouse_pos,
+			selected_body.pos * SCALE,
+			5,
+			rl.ColorBrightness(selected_body.color, -0.2),
+		)
 		rl.DrawCircleV(mouse_pos, CURSOR_SIZE, rl.ColorBrightness(selected_body.color, -0.2))
 	}
 
@@ -239,34 +247,49 @@ add_bodies :: proc() {
 		color  = rl.RED,
 		pos    = Vector2{SCREEN_WIDTH / 2, SCREEN_HEIGHT / 4},
 	}
-
 	append(&bodies, body1)
 	append(&bodies, body2)
 	append(&bodies, body3)
 	append(&bodies, body4)
 }
 
-main :: proc() {
-	rl.InitWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "Momentum")
-	defer rl.CloseWindow()
+// called every frame from platform
+update :: proc() {
+	dt := rl.GetFrameTime()
+	rl.SetWindowTitle(rl.TextFormat("%d", rl.GetFPS()))
 
+	when ODIN_OS != .JS {
+		if rl.IsCursorHidden() && selected_body == nil do rl.ShowCursor()
+		else if !rl.IsCursorHidden() && selected_body != nil do rl.DisableCursor()
+	}
+
+	interact_with_bodies(dt)
+
+	update_bodies(dt)
+	update_draw_frame()
+}
+
+
+// we call this from respective platform
+init :: proc() {
+	rl.InitWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "Momentum")
 	rl.SetTargetFPS(500)
 	rlgl.SetLineWidth(2)
 
 	add_bodies()
+}
 
-	for !rl.WindowShouldClose() {
-		dt := rl.GetFrameTime()
-		rl.SetWindowTitle(rl.TextFormat("%d", rl.GetFPS()))
+shutdown :: proc() {rl.CloseWindow()}
 
-		if rl.IsCursorHidden() && selected_body == nil do rl.ShowCursor()
-		else if !rl.IsCursorHidden() && selected_body != nil do rl.HideCursor()
+parent_window_size_changed :: proc(w, h: i32) {rl.SetWindowSize(w, h)}
 
-		interact_with_bodies(dt)
-
-		update_bodies(dt)
-		update_draw_frame()
-
+should_run :: proc() -> bool {
+	when ODIN_OS != .JS {
+		// Never run this proc in browser. It contains a 16 ms sleep on web!
+		if rl.WindowShouldClose() {
+			quit = true
+		}
 	}
 
+	return !quit
 }
